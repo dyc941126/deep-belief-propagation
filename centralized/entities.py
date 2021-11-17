@@ -37,12 +37,14 @@ class VariableNode(Node):
                 if other_nei not in self.incoming_msg:
                     continue
                 msg = elementwise_add(msg, self.incoming_msg[other_nei])
+            norm = min(msg)
+            msg = [x - norm for x in msg]
             # damping & normalizing
-            if nei in self.prev_sent:
+            if nei in self.prev_sent and 0 < VariableNode.damp_factor < 1:
                 prev = self.prev_sent[nei]
                 msg = [(1 - VariableNode.damp_factor) * x + VariableNode.damp_factor * y for x, y in zip(msg, prev)]
-            norm = sum(msg) / len(msg)
-            msg = [x - norm for x in msg]
+                norm = min(msg)
+                msg = [x - norm for x in msg]
             self.prev_sent[nei] = list(msg)
             # send the message to nei
             self.neighbors[nei].incoming_msg[self.name] = msg

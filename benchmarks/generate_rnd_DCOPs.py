@@ -6,7 +6,7 @@ from problem import Problem
 if __name__ == '__main__':
     nb_instances = 20
     nb_agents = 100
-    density = 0.05
+    density = 0.5
     domain_size = 10
     pth = f'../problem_instance/randomDCOPs/{nb_agents}/{density}/{domain_size}'
     if os.path.exists(pth):
