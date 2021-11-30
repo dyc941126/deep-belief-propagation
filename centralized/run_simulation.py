@@ -4,7 +4,7 @@ from entities import FactorGraph, VariableNode, FunctionNode
 if __name__ == '__main__':
     pth = '../problem_instance/randomDCOPs/100/0.5/10/0.xml'
     best_cost = 99999999
-    VariableNode.damp_factor = .9
+    VariableNode.damp_factor = .0
     fg = FactorGraph(pth, FunctionNode, VariableNode)
     for it in range(1000):
         cost = fg.step()
