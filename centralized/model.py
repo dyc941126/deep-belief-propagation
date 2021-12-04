@@ -49,7 +49,7 @@ class AttentiveBP(nn.Module):
         if type(sum_to_ass_prefix) is not None:
             edge_attr2 = torch.cat([sum_to_ass_prefix, hidden2], dim=1)
         else:
-
+            edge_attr2 = hidden2
         assert edge_attr1.shape[1] == edge_attr2.shape[1]
         assert edge_attr1.shape[0] + edge_attr2.shape[0] == edge_index.shape[1]
         edge_attr = torch.cat([edge_attr1, edge_attr2], dim=0)
