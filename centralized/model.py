@@ -42,8 +42,14 @@ class AttentiveBP(nn.Module):
         hidden2 = self.gru2(sum_to_ass_msg, sum_to_ass_hidden)
 
         # construct edge feature
-        edge_attr1 = torch.cat([ass_to_sum_prefix, local_costs, hidden1], dim=1)
-        edge_attr2 = torch.cat([sum_to_ass_prefix, hidden2], dim=1)
+        if type(ass_to_sum_prefix) is not None:
+            edge_attr1 = torch.cat([ass_to_sum_prefix, local_costs, hidden1], dim=1)
+        else:
+            edge_attr1 = torch.cat([ass_to_sum_prefix, local_costs, hidden1], dim=1)
+        if type(sum_to_ass_prefix) is not None:
+            edge_attr2 = torch.cat([sum_to_ass_prefix, hidden2], dim=1)
+        else:
+
         assert edge_attr1.shape[1] == edge_attr2.shape[1]
         assert edge_attr1.shape[0] + edge_attr2.shape[0] == edge_index.shape[1]
         edge_attr = torch.cat([edge_attr1, edge_attr2], dim=0)

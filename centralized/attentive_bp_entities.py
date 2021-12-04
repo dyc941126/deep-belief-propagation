@@ -2,6 +2,7 @@ import random
 
 import torch
 
+from centralized.parser import parse
 from entities import VariableNode, FunctionNode
 
 
@@ -199,10 +200,13 @@ class AttentiveVariableNode(VariableNode):
             self.prev_sent[target] = results.detach()
             self.neighbors[target].incoming_msg[self.name] = results
 
-    def compute_belief(self):
+    def compute_distribution(self):
         all_income_messages = torch.stack([self.incoming_msg[n] for n in self.ordered_neighbors], dim=0)
         belief = all_income_messages.sum(dim=0)
         self.distribution = torch.softmax(belief, dim=0)
+
+    def make_decision(self):
+        return self.distribution.argmin().item()
 
     def compute_local_loss(self):
         loss = 0
@@ -225,4 +229,54 @@ class AttentiveFunctionNode(FunctionNode):
     def register_feature_extractor(self, feature_extractor):
         self.device = feature_extractor.device
         self.data = torch.tensor(self.matrix, dtype=torch.float32, device=self.device)
+        self.incoming_msg[self.row_vn.name] = torch.zeros(self.row_vn.dom_size, device=self.device)
+        self.incoming_msg[self.col_vn.name] = torch.zeros(self.col_vn.dom_size, device=self.device)
 
+    def compute_msgs(self):
+        neighbors = [self.row_vn, self.col_vn]
+        for vn in neighbors:
+            oppo = [v for v in neighbors if v != vn][0]
+            msg = self.incoming_msg[oppo.name]
+            if oppo == self.row_vn:
+                msg = msg.unsqueeze(1)
+                min_dim = 0
+            else:
+                msg = msg.unsqueeze(0)
+                min_dim = 1
+            data = self.data + msg
+            data, _ = data.min(min_dim)
+            vn.incoming_msg[self.name] = data
+
+
+class AttentiveFactorGraph:
+    def __init__(self, pth):
+        self.variable_nodes = dict()
+        self.function_nodes = []
+        all_vars, all_matrix = parse(pth)
+        self._construct_nodes(all_vars, all_matrix)
+
+    def _construct_nodes(self, all_vars, all_matrix):
+        for v, dom in all_vars:
+            self.variable_nodes[v] = AttentiveVariableNode(v, dom)
+        for matrix, row, col in all_matrix:
+            self.function_nodes.append(AttentiveFunctionNode(f'({row},{col})', matrix, self.variable_nodes[row],
+                                                               self.variable_nodes[col]))
+        all_degree = sum([len(x.neighbors) for x in self.variable_nodes.values()])
+        assert int(all_degree / 2) == len(self.function_nodes)
+
+    def step(self, training=False):
+        for func in self.function_nodes:
+            func.compute_msgs()
+        for variable in self.variable_nodes.values():
+            variable.compute_msgs()
+            variable.compute_distribution()
+            variable.make_decision()
+        loss = 0
+        if training:
+            for variable in self.variable_nodes.values():
+                loss = loss + variable.compute_local_loss()
+            loss /= len(self.variable_nodes)
+        cost = 0
+        for func in self.function_nodes:
+            cost += func.matrix[func.row_vn.val_idx][func.col_vn.val_idx]
+        return cost, loss
