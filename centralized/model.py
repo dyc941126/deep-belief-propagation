@@ -15,7 +15,7 @@ class Attention(nn.Module):
     def forward(self, query, key):
         query = self.query_proj(query)
         key = self.key_proj(key)
-        return self.score_proj(torch.cat([query, key], dim=1))
+        return F.sigmoid(self.score_proj(torch.cat([query, key], dim=1)))
 
 
 class AttentiveBP(nn.Module):
@@ -32,8 +32,8 @@ class AttentiveBP(nn.Module):
         for _ in range(num_heads):
             self.attentions.append(Attention(out_channels))
 
-    def forward(self, x, edge_index, ass_to_sum_prefix, local_costs, ass_to_sum_msg,
-                ass_to_sum_hidden, sum_to_ass_prefix, sum_to_ass_msg, sum_to_ass_hidden,
+    def forward(self, x, edge_index, ass_to_sum_prefix, sum_to_ass_prefix, local_costs, ass_to_sum_msg,
+                ass_to_sum_hidden, sum_to_ass_msg, sum_to_ass_hidden,
                 scatter_indexes, scatter_dom_size,
                 neighbor_idx_info  # {x_i: {idx: []}}
                 ):
@@ -42,11 +42,11 @@ class AttentiveBP(nn.Module):
         hidden2 = self.gru2(sum_to_ass_msg, sum_to_ass_hidden)
 
         # construct edge feature
-        if type(ass_to_sum_prefix) is not None:
+        if ass_to_sum_prefix is not None:
             edge_attr1 = torch.cat([ass_to_sum_prefix, local_costs, hidden1], dim=1)
         else:
-            edge_attr1 = torch.cat([ass_to_sum_prefix, local_costs, hidden1], dim=1)
-        if type(sum_to_ass_prefix) is not None:
+            edge_attr1 = torch.cat([local_costs, hidden1], dim=1)
+        if sum_to_ass_prefix is not None:
             edge_attr2 = torch.cat([sum_to_ass_prefix, hidden2], dim=1)
         else:
             edge_attr2 = hidden2
@@ -56,9 +56,13 @@ class AttentiveBP(nn.Module):
 
         # graph conv
         x = self.conv1(x, edge_index, edge_attr)
+        x = F.leaky_relu(x)
         x = self.conv2(x, edge_index, edge_attr)
+        x = F.leaky_relu(x)
         x = self.conv3(x, edge_index, edge_attr)
+        x = F.leaky_relu(x)
         x = self.conv4(x, edge_index, edge_attr)
+        x = F.leaky_relu(x)
 
         # pooling
         pooling = scatter_sum(x, scatter_indexes, dim=0)[1:]  # each row is the sum of embeddings for a set of summarize node

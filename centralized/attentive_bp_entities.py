@@ -15,7 +15,7 @@ def msg_to_tensor(msg, device):
 
 
 class FeatureConstructor:
-    vn_id_embed_ub = 0.5
+    vn_id_embed_ub = 0.1
 
     def __init__(self, variable_nodes, function_nodes, assignment_node_prefix=None, summarize_node_prefix=None,
                  node_embed_dim=8, ass_to_sum_hidden=8, sum_to_ass_hidden=8, device='cpu',
@@ -51,7 +51,7 @@ class FeatureConstructor:
             self.vn_node_index[vn.name] = (start, end)
 
         # build init node embedding for summarize nodes
-        scatter_dom_size = [1]  # used for pooling
+        scatter_dom_size = []  # used for pooling
         idx = 1
         sn_id_embed_len = node_embed_dim - len(summarize_node_prefix)
         sn_embed = summarize_node_prefix + [0 for _ in range(sn_id_embed_len)]  # 0 for padding
@@ -59,23 +59,23 @@ class FeatureConstructor:
             i = fn.row_vn.name
             j = fn.col_vn.name
             start = len(x)
+            scatter_dom_size.append(fn.col_vn.dom_size)
             for _ in range(fn.col_vn.dom_size):
                 x.append(sn_embed)
                 scatter_indexes.append(idx)  # all f_ij -> x_j summarize nodes belong to the same group
-                scatter_dom_size.append(fn.col_vn.dom_size)
             end = len(x)
             idx += 1  # increase group id
             self.fn_node_index[fn.name] = {i: (start, end)}
             start = len(x)
+            scatter_dom_size.append(fn.row_vn.dom_size)
             for _ in range(fn.row_vn.dom_size):
                 x.append(sn_embed)
                 scatter_indexes.append(idx)  # all f_ij -> x_i summarize nodes belong to the same group
-                scatter_dom_size.append(fn.row_vn.dom_size)
             end = len(x)
             idx += 1
             self.fn_node_index[fn.name][j] = (start, end)
         self.x = torch.tensor(x, dtype=torch.float32, device=device)
-        self.scatter_indexes = torch.tensor(scatter_indexes, torch.long, device=device)
+        self.scatter_indexes = torch.tensor(scatter_indexes, dtype=torch.long, device=device)
         self.scatter_dom_size = torch.tensor(scatter_dom_size, device=device).unsqueeze(1)
 
         # build edge index
@@ -93,14 +93,14 @@ class FeatureConstructor:
                 self.local_costs += [fn.matrix[k][val] for k in range(fn.row_vn.dom_size)]
                 # x_i -> f_ij
                 src += [idx for idx in range(*self.vn_node_index[i])]
-                dest += [self.fn_node_index[fn.name][i][0] + val] * len(fn.row_vn.dom_size)
+                dest += [self.fn_node_index[fn.name][i][0] + val] * fn.row_vn.dom_size
 
             for val in range(fn.row_vn.dom_size):
                 ass_to_sum_cnt += fn.col_vn.dom_size
                 self.local_costs += [fn.matrix[val][k] for k in range(fn.col_vn.dom_size)]
                 # x_j -> f_ij
                 src += [idx for idx in range(*self.vn_node_index[j])]
-                dest += [self.fn_node_index[fn.name][j][0] + val] * len(fn.col_vn.dom_size)
+                dest += [self.fn_node_index[fn.name][j][0] + val] * fn.col_vn.dom_size
         # summarize node -> assignment node
         for fn in function_nodes:
             i = fn.row_vn.name
@@ -116,21 +116,24 @@ class FeatureConstructor:
                 sum_to_ass_cnt += 1
 
         self.edge_index = torch.tensor(edge_index, dtype=torch.long, device=device)
-        self.ass_to_sum_hidden = torch.zeros(ass_to_sum_cnt, ass_to_sum_hidden, device=device)
-        self.sum_to_ass_hidden = torch.zeros(sum_to_ass_cnt, sum_to_ass_hidden, device=device)
+        self.ass_to_sum_hidden = torch.randn(ass_to_sum_cnt, ass_to_sum_hidden, device=device) * 0.01
+        self.sum_to_ass_hidden = torch.randn(sum_to_ass_cnt, sum_to_ass_hidden, device=device) * 0.01
         self.local_costs = torch.tensor(self.local_costs, dtype=torch.float32, device=device).unsqueeze(1)
         self.ass_to_sum_prefix = None
         if ass_to_sum_prefix is not None:
             self.ass_to_sum_prefix = torch.tensor(ass_to_sum_prefix, dtype=torch.float32, device=device).repeat(ass_to_sum_cnt, 1)
+        else:
+            self.ass_to_sum_prefix = None
         if sum_to_ass_prefix is not None:
             self.sum_to_ass_prefix = torch.tensor(sum_to_ass_prefix, dtype=torch.float32, device=device).repeat(sum_to_ass_cnt, 1)
+        else:
+            self.sum_to_ass_prefix = None
         self.device = device
         self.attentive_weights = dict()  # returned by neural network
-
         for vn in variable_nodes:
             in_idxes = []
             out_indexes = []
-            for fn in vn.neighbors:
+            for fn in vn.neighbors.values():
                 idx = self.function_nodes.index(fn)
                 idx *= 2
                 if vn == fn.row_vn:
@@ -156,19 +159,19 @@ class FeatureConstructor:
             i = fn.row_vn
             j = fn.col_vn
             # x_i -> f_ij
-            msg = msg_to_tensor(fn.income_msg[i.name], self.device)
+            msg = msg_to_tensor(fn.incoming_msg[i.name], self.device)
             msg = msg.repeat(j.dom_size)
             ass_to_sum.append(msg)
             # f_ij -> x_j
-            msg = msg_to_tensor(j.income_msg[fn.name], self.device)
+            msg = msg_to_tensor(j.incoming_msg[fn.name], self.device)
             sum_to_ass.append(msg)
 
             # x_j -> f_ij
-            msg = msg_to_tensor(fn.income_msg[j.name], self.device)
+            msg = msg_to_tensor(fn.incoming_msg[j.name], self.device)
             msg = msg.repeat(i.dom_size)
             ass_to_sum.append(msg)
             # f_ij -> x_i
-            msg = msg_to_tensor(i.income_msg[fn.name], self.device)
+            msg = msg_to_tensor(i.incoming_msg[fn.name], self.device)
             sum_to_ass.append(msg)
         return torch.cat(ass_to_sum).unsqueeze(1), torch.cat(sum_to_ass).unsqueeze(1)
 
@@ -203,10 +206,10 @@ class AttentiveVariableNode(VariableNode):
     def compute_distribution(self):
         all_income_messages = torch.stack([self.incoming_msg[n] for n in self.ordered_neighbors], dim=0)
         belief = all_income_messages.sum(dim=0)
-        self.distribution = torch.softmax(belief, dim=0)
+        self.distribution = torch.softmax(-belief, dim=0)
 
     def make_decision(self):
-        return self.distribution.argmin().item()
+        self.val_idx = self.distribution.argmax().item()
 
     def compute_local_loss(self):
         loss = 0
@@ -216,7 +219,7 @@ class AttentiveVariableNode(VariableNode):
                 j_dist = fn.col_vn.distribution.unsqueeze(1)
                 expected_cost = torch.mm(i_dist, fn.data)
                 expected_cost = torch.mm(expected_cost, j_dist)
-                loss = loss + expected_cost
+                loss = loss + expected_cost.squeeze()
         return loss
 
 
@@ -249,10 +252,10 @@ class AttentiveFunctionNode(FunctionNode):
 
 
 class AttentiveFactorGraph:
-    def __init__(self, pth):
+    def __init__(self, pth, scale=100):
         self.variable_nodes = dict()
         self.function_nodes = []
-        all_vars, all_matrix = parse(pth)
+        all_vars, all_matrix = parse(pth, scale=scale)
         self._construct_nodes(all_vars, all_matrix)
 
     def _construct_nodes(self, all_vars, all_matrix):
@@ -264,18 +267,32 @@ class AttentiveFactorGraph:
         all_degree = sum([len(x.neighbors) for x in self.variable_nodes.values()])
         assert int(all_degree / 2) == len(self.function_nodes)
 
-    def step(self, training=False):
+    def step(self, model, fe, training=False, first_it=True):
         for func in self.function_nodes:
             func.compute_msgs()
+        a2s_msgs, s2a_msgs = fe.update_message()
         for variable in self.variable_nodes.values():
-            variable.compute_msgs()
             variable.compute_distribution()
             variable.make_decision()
         loss = 0
-        if training:
+        if training and not first_it:
             for variable in self.variable_nodes.values():
                 loss = loss + variable.compute_local_loss()
             loss /= len(self.variable_nodes)
+        fe.attentive_weights, fe.ass_to_sum_hidden, fe.sum_to_ass_hidden = model(fe.x,
+                                                                                 fe.edge_index,
+                                                                                 fe.ass_to_sum_prefix,
+                                                                                 fe.sum_to_ass_prefix,
+                                                                                 fe.local_costs,
+                                                                                 a2s_msgs,
+                                                                                 fe.ass_to_sum_hidden,
+                                                                                 s2a_msgs,
+                                                                                 fe.sum_to_ass_hidden,
+                                                                                 fe.scatter_indexes,
+                                                                                 fe.scatter_dom_size,
+                                                                                 fe.neighbor_idx_info)
+        for variable in self.variable_nodes.values():
+            variable.compute_msgs()
         cost = 0
         for func in self.function_nodes:
             cost += func.matrix[func.row_vn.val_idx][func.col_vn.val_idx]
