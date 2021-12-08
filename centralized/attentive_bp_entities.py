@@ -14,6 +14,12 @@ def msg_to_tensor(msg, device):
     return msg.squeeze()
 
 
+def save_grad(grads, name):
+    def hook(grad):
+        grads[name] = grad
+    return hook
+
+
 class FeatureConstructor:
     vn_id_embed_ub = 0.1
 
@@ -183,6 +189,7 @@ class AttentiveVariableNode(VariableNode):
         self.ordered_neighbors = []
         self.device = ''
         self.distribution = None
+        self.grads = dict()
 
     def register_feature_extractor(self, feature_extractor):
         self.feature_extractor = feature_extractor
@@ -200,13 +207,23 @@ class AttentiveVariableNode(VariableNode):
             results = torch.mm(msgs, self.feature_extractor.attentive_weights[self.name][self.feature_extractor.neighbor_idx_mapping[self.name][target]])
             results = results.mean(dim=1)
             results = results - results.min().item()
+            if results.requires_grad:
+                results.register_hook(save_grad(self.grads, f'{self.name} -> {target}'))
+                self.feature_extractor.attentive_weights[self.name][
+                    self.feature_extractor.neighbor_idx_mapping[self.name][target]].register_hook(save_grad(self.grads, f'attention weight {self.name} -> {target}'))
             self.prev_sent[target] = results.detach()
             self.neighbors[target].incoming_msg[self.name] = results
 
     def compute_distribution(self):
         all_income_messages = torch.stack([self.incoming_msg[n] for n in self.ordered_neighbors], dim=0)
+        if all_income_messages.requires_grad:
+            all_income_messages.register_hook(save_grad(self.grads, 'all_income_messages'))
         belief = all_income_messages.sum(dim=0)
+        if belief.requires_grad:
+            belief.register_hook(save_grad(self.grads, 'belief'))
         self.distribution = torch.softmax(-belief, dim=0)
+        if self.distribution.requires_grad:
+            self.distribution.register_hook(save_grad(self.grads, 'distribution'))
 
     def make_decision(self):
         self.val_idx = self.distribution.argmax().item()
@@ -220,6 +237,8 @@ class AttentiveVariableNode(VariableNode):
                 expected_cost = torch.mm(i_dist, fn.data)
                 expected_cost = torch.mm(expected_cost, j_dist)
                 loss = loss + expected_cost.squeeze()
+        if type(loss) is not int:
+            loss.register_hook(save_grad(self.grads, 'loss'))
         return loss
 
 
@@ -248,6 +267,8 @@ class AttentiveFunctionNode(FunctionNode):
                 min_dim = 1
             data = self.data + msg
             data, _ = data.min(min_dim)
+            if data.requires_grad:
+                data.register_hook(save_grad(vn.grads, f'{self.name}->{vn.name}'))
             vn.incoming_msg[self.name] = data
 
 
