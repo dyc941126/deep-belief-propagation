@@ -137,6 +137,8 @@ class Problem:
                     cost = 0 if i != j else 1
                 else:
                     cost = 0 if i != j else random.randint(min_cost, max_cost)
+                if cost == 0 and gc and decimal > 0:
+                    cost = round(random.random() * 0.01, decimal)
                 data[i][j] = cost
         return data
 
