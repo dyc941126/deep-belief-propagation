@@ -231,7 +231,7 @@ class AttentiveVariableNode(VariableNode):
     def compute_local_loss(self):
         normalized_dist = self.distribution + 1e-6
         entropy = -(normalized_dist * torch.log2(normalized_dist)).sum()
-        loss = entropy
+        loss = 0.1 * entropy
         i_dist = self.distribution.unsqueeze(0)
         for fn in self.neighbors.values():
             if self == fn.row_vn:
@@ -301,19 +301,34 @@ class AttentiveFactorGraph:
         if training and not first_it:
             for variable in self.variable_nodes.values():
                 loss = loss + variable.compute_local_loss()
-            loss /= len(self.variable_nodes)
-        fe.attentive_weights, fe.ass_to_sum_hidden, fe.sum_to_ass_hidden = model(fe.x,
-                                                                                 fe.edge_index,
-                                                                                 fe.ass_to_sum_prefix,
-                                                                                 fe.sum_to_ass_prefix,
-                                                                                 fe.local_costs,
-                                                                                 a2s_msgs,
-                                                                                 fe.ass_to_sum_hidden,
-                                                                                 s2a_msgs,
-                                                                                 fe.sum_to_ass_hidden,
-                                                                                 fe.scatter_indexes,
-                                                                                 fe.scatter_dom_size,
-                                                                                 fe.neighbor_idx_info)
+            # loss /= len(self.variable_nodes)
+        if training:
+            fe.attentive_weights, fe.ass_to_sum_hidden, fe.sum_to_ass_hidden = model(fe.x,
+                                                                                     fe.edge_index,
+                                                                                     fe.ass_to_sum_prefix,
+                                                                                     fe.sum_to_ass_prefix,
+                                                                                     fe.local_costs,
+                                                                                     a2s_msgs,
+                                                                                     fe.ass_to_sum_hidden,
+                                                                                     s2a_msgs,
+                                                                                     fe.sum_to_ass_hidden,
+                                                                                     fe.scatter_indexes,
+                                                                                     fe.scatter_dom_size,
+                                                                                     fe.neighbor_idx_info)
+        else:
+            with torch.no_grad():
+                fe.attentive_weights, fe.ass_to_sum_hidden, fe.sum_to_ass_hidden = model(fe.x,
+                                                                                         fe.edge_index,
+                                                                                         fe.ass_to_sum_prefix,
+                                                                                         fe.sum_to_ass_prefix,
+                                                                                         fe.local_costs,
+                                                                                         a2s_msgs,
+                                                                                         fe.ass_to_sum_hidden,
+                                                                                         s2a_msgs,
+                                                                                         fe.sum_to_ass_hidden,
+                                                                                         fe.scatter_indexes,
+                                                                                         fe.scatter_dom_size,
+                                                                                         fe.neighbor_idx_info)
         for variable in self.variable_nodes.values():
             variable.compute_msgs()
         cost = 0
