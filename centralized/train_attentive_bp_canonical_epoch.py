@@ -11,15 +11,15 @@ from utilities import elementwise_add
 
 if __name__ == '__main__':
     train_problems_pth = '../problem_instance/randomDCOPs/train'
-    valid_problems_pth = '../problem_instance/randomDCOPs/valid'
+    valid_problems_pth = '../problem_instance/randomDCOPs/test'
     model_save_pth = '../models'
     if not os.path.exists(model_save_pth):
         os.makedirs(model_save_pth)
     nb_epoch = 10000
     nb_iteration = 100
-    nb_timestep = 1000
+    nb_timestep = 100
     valid_interval = nb_iteration
-    m = AttentiveBP(8, 16, 1, 7, 1, 8, 4)
+    m = AttentiveBP(8, 16, 1, 15, 1, 16, 4)
     device = 'cuda:1'
     m.to(device)
     optimizer = torch.optim.AdamW(m.parameters(), lr=0.0005, weight_decay=5e-5)
@@ -34,11 +34,15 @@ if __name__ == '__main__':
     scale = 10
     for ep in range(nb_epoch):
         pth = random.choice(train_list)
+        printed = False
         for it in range(nb_iteration):
             total_training_steps += 1
             m.train()
             fg = AttentiveFactorGraph(pth, scale=scale)
-            fe = FeatureConstructor(fg.variable_nodes.values(), fg.function_nodes, ass_to_sum_hidden=7, device=device)
+            fe = FeatureConstructor(fg.variable_nodes.values(), fg.function_nodes, ass_to_sum_hidden=15, sum_to_ass_hidden=16, device=device)
+            if not printed:
+                print(f'{len(fg.variable_nodes)} variables, {len(fg.function_nodes)} factors')
+                printed = True
             losses = []
             costs = []
             best_cost = 100000
@@ -50,13 +54,14 @@ if __name__ == '__main__':
                     costs.append(c)
                     best_cost = min(best_cost, c)
             indexes = sorted(range(len(costs)), key=costs.__getitem__)
-            top10_costs = []
+            k = 10
+            topk_costs = []
             loss = 0
-            for i in range(10):
-                top10_costs.append(costs[indexes[i]])
+            for i in range(k):
+                topk_costs.append(costs[indexes[i]])
                 loss = loss + losses[indexes[i]]
-            loss = loss / 10
-            print('{:.4f}'.format(loss.item()), int(sum(costs) / (nb_timestep - 1)), int(best_cost), int(sum(top10_costs) / 10))
+            loss = loss / k
+            print(it, '{:.4f}'.format(loss.item()), int(sum(costs) / (nb_timestep - 1)), int(best_cost), int(sum(topk_costs) / k))
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -65,7 +70,7 @@ if __name__ == '__main__':
                 cost_in_timestep = [0] * nb_timestep
                 for valid_pth in valid_list:
                     fg = AttentiveFactorGraph(valid_pth, scale=scale)
-                    fe = FeatureConstructor(fg.variable_nodes.values(), fg.function_nodes, ass_to_sum_hidden=7,
+                    fe = FeatureConstructor(fg.variable_nodes.values(), fg.function_nodes, ass_to_sum_hidden=15, sum_to_ass_hidden=16,
                                             device=device)
                     costs = []
                     for ts in range(nb_timestep):

@@ -32,18 +32,25 @@ def run(problem_dir, cycle=1000, damped_factor=.9):
 
 
 if __name__ == '__main__':
-    pth = '../problem_instance/randomDCOPs/test'
-    result_pth = '../maxsum_results'
-    if not os.path.exists(result_pth):
-        os.makedirs(result_pth)
-    for d in os.listdir(pth):
-        c, bc = run(os.path.join(pth, d, '0.1'))
-        with open(f'{result_pth}/dms_{d}_0.1_cic.txt', 'a') as rf:
-            rf.write(str(c) + '\n')
-        with open(f'{result_pth}/dms_{d}_0.1_bcic.txt', 'a') as rf:
-            rf.write(str(bc) + '\n')
-        c, bc = run(os.path.join(pth, d, '0.1_wgc'))
-        with open(f'{result_pth}/dms_{d}_0.1_wgc_cic.txt', 'a') as rf:
-            rf.write(str(c) + '\n')
-        with open(f'{result_pth}/dms_{d}_0.1_wgc_bcic.txt', 'a') as rf:
-            rf.write(str(bc) + '\n')
+    pth = '../problem_instance/wgc/60/0.1'
+    c, bc = run(pth)
+    with open(f'{pth}/dms_cic.txt', 'a') as rf:
+        rf.write(str(c) + '\n')
+    with open(f'{pth}/dms_bcic.txt', 'a') as rf:
+        rf.write(str(bc) + '\n')
+
+    # pth = '../problem_instance/randomDCOPs/test'
+    # result_pth = '../maxsum_results'
+    # if not os.path.exists(result_pth):
+    #     os.makedirs(result_pth)
+    # for d in os.listdir(pth):
+    #     c, bc = run(os.path.join(pth, d, '0.1'))
+    #     with open(f'{result_pth}/dms_{d}_0.1_cic.txt', 'a') as rf:
+    #         rf.write(str(c) + '\n')
+    #     with open(f'{result_pth}/dms_{d}_0.1_bcic.txt', 'a') as rf:
+    #         rf.write(str(bc) + '\n')
+    #     c, bc = run(os.path.join(pth, d, '0.1_wgc'))
+    #     with open(f'{result_pth}/dms_{d}_0.1_wgc_cic.txt', 'a') as rf:
+    #         rf.write(str(c) + '\n')
+    #     with open(f'{result_pth}/dms_{d}_0.1_wgc_bcic.txt', 'a') as rf:
+    #         rf.write(str(bc) + '\n')
