@@ -35,6 +35,16 @@ class Problem:
         self.domain_idx = 1
         self.constraint_idx = 1
 
+    def from_networkx(self, g, domain_size, min_cost=0, max_cost=100, gc=False,
+                          weighted=False, decimal=-1):
+        self.reset()
+        for i in g.nodes:
+            self.add_agent(i + 1, domain_size)
+        for agnt1, agnt2 in g.edges:
+            self.add_constraint([agnt1 + 1, agnt2 + 1], Problem._random_matrix(domain_size, domain_size,
+                                                                           min_cost, max_cost, gc, weighted, decimal))
+
+
     def random_sensor_net(self, grid_size, domain_size, min_cost=0, max_cost=100, gc=False,
                           weighted=False, decimal=-1):
         self.reset()
@@ -137,6 +147,8 @@ class Problem:
                     cost = 0 if i != j else 1
                 else:
                     cost = 0 if i != j else random.randint(min_cost, max_cost)
+                if cost == 0 and gc and decimal > 0:
+                    cost = round(random.random() * 0.001, decimal)
                 data[i][j] = cost
         return data
 
