@@ -1,17 +1,14 @@
 import os.path
+import random
 import shutil
 from problem import Problem
-
+import networkx as nx
 
 if __name__ == '__main__':
     nb_instances = 20
-    nb_agents = 100
-    density = 0.5
-    domain_size = 10
-    pth = f'../problem_instance/randomDCOPs/{nb_agents}/{density}/{domain_size}'
-    if os.path.exists(pth):
-        shutil.rmtree(pth, ignore_errors=True)
-    for i in range(nb_instances):
-        p = Problem()
-        p.random_binary(nb_agents, domain_size, density)
-        p.save(f'{pth}/{i}.xml')
+    pth = '../problem_instance/wgc'
+    for ag in range(60, 101, 10):
+        for i in range(nb_instances):
+            p = Problem()
+            p.random_binary(ag, 3, 0.1, gc=True, weighted=True, decimal=5)
+            p.save(f'{pth}/{ag}/0.1/{i}.xml')
