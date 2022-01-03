@@ -1,4 +1,4 @@
-from utilities import elementwise_add, argmin
+from .utilities import elementwise_add, argmin
 from centralized.parser import parse
 
 

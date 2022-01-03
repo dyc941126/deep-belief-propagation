@@ -4,11 +4,11 @@ from entities import VariableNode, FunctionNode, FactorGraph
 
 
 if __name__ == '__main__':
-    pth = ''
-    leap = ''
+    pth = '../problem_instance/wgc'
+    leap = '0.1'
     VariableNode.damp_factor = .9
     for directory in os.listdir(pth):
-        cur_pth = f'{pth}/{"" if leap == "" else leap + "/"}{directory}'
+        cur_pth = f'{pth}/{directory}{"" if leap == "" else "/" + leap}'
         cic_pth = f'{cur_pth}/dms_cic.txt'
         bcic_pth = f'{cur_pth}/dms_bcic.txt'
         for rp in [cic_pth, bcic_pth]:
@@ -27,6 +27,7 @@ if __name__ == '__main__':
                     bcic.append(cic[-1])
                 else:
                     bcic.append(min(bcic[-1], cic[-1]))
+            print(directory, pf, bcic[-1])
             with open(cic_pth, 'a') as rf:
                 rf.write(str(cic) + '\n')
             with open(bcic_pth, 'a') as rf:
