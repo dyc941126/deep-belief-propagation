@@ -46,7 +46,7 @@ class AttentiveVariableNode(VariableNode):
     def compute_local_loss(self):
         normalized_dist = self.distribution + 1e-6
         entropy = -(normalized_dist * torch.log2(normalized_dist)).sum()
-        loss = 0.1 * entropy
+        loss = 0.0 * entropy
         i_dist = self.distribution.unsqueeze(0)
         for fn in self.neighbors.values():
             if self == fn.row_vn:
@@ -56,12 +56,22 @@ class AttentiveVariableNode(VariableNode):
                 loss = loss + expected_cost.squeeze()
         return loss
 
+    def reset(self):
+        for n in self.incoming_msg.keys():
+            if not type(self.incoming_msg[n]) is list:
+                self.incoming_msg[n] = self.incoming_msg[n].detach().clone()
+
 
 class AttentiveFunctionNode(FunctionNode):
     def __init__(self, name, matirx, row_vn, col_vn):
         super().__init__(name, matirx, row_vn, col_vn)
         self.device = ''
         self.data = None
+
+    def reset(self):
+        for n in self.incoming_msg.keys():
+            if not type(self.incoming_msg[n]) is list:
+                self.incoming_msg[n] = self.incoming_msg[n].detach().clone()
 
     def register_feature_extractor(self, feature_extractor):
         self.device = feature_extractor.device

@@ -56,7 +56,7 @@ if __name__ == '__main__':
                     costs.append(c)
                     best_cost = min(best_cost, c)
             indexes = sorted(range(len(costs)), key=costs.__getitem__)
-            k = 10
+            k = 2
             topk_costs = []
             loss = 0
             for i in range(k):

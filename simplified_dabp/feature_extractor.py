@@ -6,7 +6,7 @@ ASSIGN_ID = [1, 0, 0]
 MSG_ID = [0, 1, 0]
 FUNCTION_ID = [0, 0, 1]
 
-NODE_ID_EMBED_UB = .0
+NODE_ID_EMBED_UB = 0
 
 
 def msg_to_tensor(msg, device):
