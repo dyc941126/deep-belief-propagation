@@ -46,7 +46,7 @@ class AttentiveVariableNode(VariableNode):
     def compute_local_loss(self):
         normalized_dist = self.distribution + 1e-6
         entropy = -(normalized_dist * torch.log2(normalized_dist)).sum()
-        loss = 0.0 * entropy
+        loss = 0.1 * entropy
         i_dist = self.distribution.unsqueeze(0)
         for fn in self.neighbors.values():
             if self == fn.row_vn:

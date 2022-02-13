@@ -98,6 +98,21 @@ class FeatureExtractor:
                 dest.append(vn_start_index[j.name] + val)
                 node_running_idx += 1
 
+        self.hidden1 = torch.zeros(hidden_cnt, node_embed_dim - 3, dtype=torch.float32, device=device)
+        self.hidden2 = torch.zeros(hidden_cnt, node_embed_dim - 3, dtype=torch.float32, device=device)
+        self.prefix = torch.tensor(MSG_ID, dtype=torch.float32, device=device)
+        self.prefix = self.prefix.repeat(2 * hidden_cnt, 1)
+        self.function_indexes = function_indexes
+        self.x = torch.tensor(x, dtype=torch.float32, device=device)
+        self.edge_index = torch.tensor(edge_index, dtype=torch.long, device=device)
+        self.device = device
+        self.attentive_weights = dict()  # returned by neural network
+
+        self.function_nodes = function_nodes
+        all_nodes = list(variable_nodes) + self.function_nodes
+        for node in all_nodes:
+            node.register_feature_extractor(self)
+
         self.neighbor_idx_mapping = dict()
         self.neighbor_idx_info = dict()
         for vn in variable_nodes:
@@ -105,7 +120,8 @@ class FeatureExtractor:
             out_indexes = []
             self.neighbor_idx_mapping[vn.name] = dict()
             self.neighbor_idx_info[vn.name] = dict()
-            for fn in vn.neighbors.values():
+            for fn in vn.ordered_neighbors:
+                fn = vn.neighbors[fn]
                 idx = function_nodes.index(fn)
                 idx *= 2
                 if vn == fn.row_vn:
@@ -119,21 +135,6 @@ class FeatureExtractor:
                 idxes = list(in_idxes)
                 idxes[i] = out_indexes[i]
                 self.neighbor_idx_info[vn.name][out_indexes[i]] = idxes
-
-        self.hidden1 = torch.zeros(hidden_cnt, node_embed_dim - 3, dtype=torch.float32, device=device)
-        self.hidden2 = torch.zeros(hidden_cnt, node_embed_dim - 3, dtype=torch.float32, device=device)
-        self.prefix = torch.tensor(MSG_ID, dtype=torch.float32, device=device)
-        self.prefix = self.prefix.repeat(2 * hidden_cnt, 1)
-        self.function_indexes = function_indexes
-        self.function_nodes = function_nodes
-        self.x = torch.tensor(x, dtype=torch.float32, device=device)
-        self.edge_index = torch.tensor(edge_index, dtype=torch.long, device=device)
-        self.device = device
-        self.attentive_weights = dict()  # returned by neural network
-
-        all_nodes = list(variable_nodes) + self.function_nodes
-        for node in all_nodes:
-            node.register_feature_extractor(self)
 
     def update_message(self):
         v2f = []
